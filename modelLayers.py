@@ -1,37 +1,33 @@
-from tensorflow.keras.layers import Dense, Flatten, MaxPooling2D, Conv2D, LeakyReLU, BatchNormalization, \
-    Activation, Add, Dropout, ZeroPadding2D, AveragePooling2D, GlobalAveragePooling2D, Concatenate
+from tensorflow.keras.layers import Dense, Conv2D, LeakyReLU, BatchNormalization, \
+    Activation, Add, Dropout, GlobalAveragePooling2D, Concatenate
 from tensorflow.keras import Model
-from tensorflow.keras.applications import VGG16, ResNet50
+from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras import activations
 
-'''
-Human Columns:,
 
-'''
-
-def res_tf(filter, kernel_size=3, stride=1, name=None): 
+def res_tf(filters, kernel_size=3, stride=1, name=None): 
     '''The identity resnet block that skips 3 layers.
     strides := the strides for dimension reduction
     filters := the 2 sizes for the convolutional layer
     '''
     def model(x):
         # Calculate shortcut
-        shortcut = Conv2D(4*filter, 1, stride, name=name+'_0_conv')(x)
+        shortcut = Conv2D(4*filters, 1, stride, name=name+'_0_conv')(x)
         shortcut = BatchNormalization(name=name+'_0_bn')(shortcut)
 
         #first block 
-        x = Conv2D(filter, 1, stride, name=name+'_1_conv')(x)
+        x = Conv2D(filters, 1, stride, name=name+'_1_conv')(x)
         x = BatchNormalization(name=name+'_1_bn')(x)
         x = Activation(activations.relu, name=name+'_1_relu')(x)
 
         #second block # bottleneck (but size kept same with padding)
-        x = Conv2D(filter, kernel_size, padding='same', name=name+'_2_conv')(x)
+        x = Conv2D(filters, kernel_size, padding='same', name=name+'_2_conv')(x)
         x = BatchNormalization(name=name+'_2_bn')(x)
         x = Activation(activations.relu, name=name+'_2_relu')(x)
 
         # third block activation used after adding the input
-        x = Conv2D(4*filter, 1, name=name+'_3_conv')(x)
+        x = Conv2D(4*filters, 1, name=name+'_3_conv')(x)
         x = BatchNormalization(name=name+'_3_bn')(x)
 
         # add the input 
@@ -143,8 +139,8 @@ latentSize = 3
 humanCols_joint = []
 for count in range(30):
     if count not in [0, 2, 18, 3, 8, 13, 19, 24, 26]: # Removed wrist/pinky zeros, then duplicates, then undesired
-        for suffix in ['x','y','z']:
-            humanCols_joint.append('joint{}_{}'.format(count,suffix))
+        for suffix in ('x','y','z'):
+            humanCols_joint.append(f'joint{count}_{suffix}')
 
 humanCols_angle = [
     'rh_FFJ1','rh_FFJ2','rh_FFJ3','rh_FFJ4','rh_MFJ1','rh_MFJ2','rh_MFJ3','rh_MFJ4','rh_RFJ1','rh_RFJ2','rh_RFJ3','rh_RFJ4','rh_LFJ1','rh_LFJ2','rh_LFJ3','rh_LFJ4','rh_LFJ5','rh_THJ1','rh_THJ2','rh_THJ3','rh_THJ4','rh_THJ5'
@@ -171,7 +167,7 @@ jointCounts = {
 
 class EncoderModel(Model):
     def __init__(self, *args, **kwargs):
-        super(EncoderModel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         # Determine Encoder Layer
         #VGG16, ResNet50
         self.stack = Concatenate()
@@ -198,8 +194,8 @@ class EncoderModel(Model):
         for layer in self.base.layers:
             layer.trainable = False
 
-    def call(self, input, training=False):
-        x = self.stack([input] * 3)
+    def call(self, inputs, training=False):
+        x = self.stack([inputs] * 3)
         x = self.base(x)
         #x = self.resconv1(input)
         #x = self.resconv2(x)
@@ -221,12 +217,12 @@ class EncoderModel(Model):
 
 class AngleDecoderModel(Model):
     def __init__(self, output_size, *args, **kwargs):
-        super(AngleDecoderModel, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.decode1 = Dense(5, LeakyReLU())
         self.decode2 = Dense(output_size, activations.sigmoid)
 
-    def call(self, input, training=False):
-        x = self.decode1(input)
+    def call(self, inputs):
+        x = self.decode1(inputs)
         x = self.decode2(x)
         return x
 

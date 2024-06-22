@@ -1,13 +1,14 @@
-from main import USIM
-
-from dataManipulation.MymeekerStructure import MeekerObject, humanHandStruct, shadowHandStruct, shadow4HandStruct, shadow3HandStruct, allegroHandStruct
-
 import os
 import cv2
 import glob
 import regex as re
 import numpy as np
 import pandas as pd
+
+from main import USIM
+from dataManager import DataManager
+
+from dataManipulation.MymeekerStructure import humanHandStruct, shadowHandStruct, shadow4HandStruct, shadow3HandStruct, allegroHandStruct
 
 
 def main():

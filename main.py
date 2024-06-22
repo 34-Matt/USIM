@@ -1,8 +1,10 @@
+"""Folder containing the main code for the USIM model"""
+
 import os
 import pickle
 import tensorflow as tf
 
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Any
 
 
 class USIM(tf.keras.Model):
@@ -28,19 +30,19 @@ class USIM(tf.keras.Model):
 
     def validateInput(
             self,
-            input: tf.Tensor,
+            inputs: tf.Tensor,
             verbose:int = 0
     ) -> bool:
         '''Validates the input
         
         Args:
-            input (Tensor): The input to the system, expected to have size of (N, *input_size)
+            inputs (Tensor): The input to the system, expected to have size of (N, *input_size)
             verbose (int): The level of information to display (0=None, 1=Only Error, 2=All Info)
 
         Returns:
             valid (bool): A boolean stating if the input is valid (True) or not (False)
         '''
-        shape = tf.shape(input)
+        shape = tf.shape(inputs)
 
         # General Info
         if verbose >= 2:
@@ -54,10 +56,10 @@ class USIM(tf.keras.Model):
             return False
         
         # Check Value
-        for i in range(len(self.input_size)):
-            if self.input_size[i] != shape[i+1]:
+        for i, size_i in enumerate(self.input_size):
+            if shape[i+1] != size_i:
                 if verbose >= 1:
-                    print(f'Found an instance where input shape differs from expectation. {shape} != {self.input_size}')
+                    print(f'Input shape {shape} is expected to have a size of {size_i} at index {i+1}')
                 return False
         
         if verbose >= 2:
@@ -73,31 +75,35 @@ class USIM(tf.keras.Model):
         
         Args:
             name (str): A name to identify the decoder
-            decoder_layers (List[Layer]): The list of layers for the decoder portion of the model
+            layers (List[Layer]): The list of layers for the decoder portion of the model
         '''
-        if name in self.decoder.keys():
+        if name in self.decoder:
             raise IndexError(f"The name {name} already exists as the decoder in the model.")
 
         self.decoder[name] = layers
 
     def call(
             self,
-            input_tensor:tf.Tensor,
-            decoder_name:str,
-            training=False
+            inputs:tf.Tensor,
+            training=False,
+            mask=None,
+            decoder_name:str=None
     ) -> List[tf.Tensor]:
         '''Calls the model
         
         Args:
-            input_tensor [Tensor]: The input to the model
+            inputs [Tensor]: The input to the model
+            training [bool]: If the model is training or not
+            mask [Tensor]: The mask to apply to the model
             decoder_name [str]: The name of the decoder to output
-            **kwargs: Extra key word arguments to pass through the call function
         
         Returns:
             Prediction [Tensor]: The output of the model
             Latent [Tensor]: The resulting latent features
         '''
-        Latent = self.encoder.call(input_tensor, training=training)
+        if decoder_name is None:
+            raise ValueError('Decoder name is required to call the model')
+        Latent = self.encoder.call(inputs, training=training)
         Prediction = self.decoder[decoder_name].call(Latent, training=training)
         return [Prediction, Latent]
 
@@ -124,8 +130,8 @@ class USIM(tf.keras.Model):
             weights [list]: The list of weights in the USIM model
         '''
         weights = self.encoder.trainable_weights
-        for name in self.decoder.keys():
-            weights.extend(self.decoder[name].trainable_weights)
+        for decoder in self.decoder.values():
+            weights.extend(decoder.trainable_weights)
         return weights
     
     def initialize(self):
@@ -134,31 +140,72 @@ class USIM(tf.keras.Model):
         temp_latent = tf.ones((5, self.latent_size))
 
         self.encoder(temp_input)
-        for name in self.decoder.keys():
-            self.decoder[name](temp_latent)
+        for decoder in self.decoder.values():
+            decoder(temp_latent)
 
-    def save(self, loc, *args, **kwargs):
-        self.encoder.save(os.path.join(loc, 'encoder'), *args, **kwargs)
+    def save(
+            self,
+            filepath: Any,
+            overwrite: bool = True,
+            include_optimizer: bool = True,
+            save_format: Any = None,
+            signatures: Any = None,
+            options: Any = None,
+            save_traces: bool = True
+        ) -> None:
+        '''Saves the model
         
-        for name in self.decoder.keys():
-            self.decoder[name].save(os.path.join(loc, 'decoder_'+name), *args, **kwargs)
+        Args:
+            filepath [Any]: The location to save the model
+            overwrite [bool]: If the model should overwrite the file
+            include_optimizer [bool]: If the optimizer should be included in the save
+            save_format [Any]: The format to save the model in
+            signatures [Any]: The signatures to save with the model
+            options [Any]: The options to save with the model
+            save_traces [bool]: If the traces should be saved with the model
+        '''
+        self.encoder.save(
+            os.path.join(filepath, 'encoder'),
+            overwrite=overwrite,
+            include_optimizer=include_optimizer,
+            save_format=save_format,
+            signatures=signatures,
+            options=options,
+            save_traces=save_traces
+            )
         
-        with open(os.path.join(loc, 'param.pickle'), 'wb') as f:
+        for name, decoder in self.decoder.items():
+            decoder.save(
+                os.path.join(filepath, 'decoder_'+name),
+                overwrite=overwrite,
+                include_optimizer=include_optimizer,
+                save_format=save_format,
+                signatures=signatures,
+                options=options,
+                save_traces=save_traces
+                )
+        
+        with open(os.path.join(filepath, 'param.pickle'), 'wb') as f:
             pickle.dump((self.input_size, self.latent_size), f)
 
     @staticmethod
-    def load(loc, *args, **kwargs):
-        with open(os.path.join(loc, 'param.pickle'), 'rb') as f:
+    def load(filepath:str):
+        '''Loads a USIM model from a file
+
+        Args:
+            filepath [str]: The location of the model to load
+        '''
+        with open(os.path.join(filepath, 'param.pickle'), 'rb') as f:
             input_size, latent_size = pickle.load(f)
 
-        encoder = tf.keras.models.load_model(os.path.join(loc, 'encoder'))
+        encoder = tf.keras.models.load_model(os.path.join(filepath, 'encoder'))
         
         model = USIM(input_size, latent_size, encoder)
         
-        for file in os.listdir(loc):
+        for file in os.listdir(filepath):
             if file.startswith('decoder_'):
                 name = file[8:]
-                model.add_decoder(name, tf.keras.models.load_model(os.path.join(loc, file)))
+                model.add_decoder(name, tf.keras.models.load_model(os.path.join(filepath, file)))
         
         return model
 
