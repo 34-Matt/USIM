@@ -1,6 +1,7 @@
 import os
 import cv2
 import glob
+import argparse
 import regex as re
 import numpy as np
 import pandas as pd
@@ -11,92 +12,100 @@ from dataManager import DataManager
 from dataManipulation.MymeekerStructure import MeekerObject, humanHandStruct, shadowHandStruct, shadow4HandStruct, shadow3HandStruct, allegroHandStruct
 
 
-def main():
-    # Create the Model
-    model = USIM.load('model')
+# Read Arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_path', help='Path to the data folder')
+parser.add_argument('--model_path', help='Path to the model folder')
+parser.add_argument('--model_name', help='Name of the model')
+parser.add_argument('--input_struct', help='Input structure of the model')
+args = parser.parse_args()
 
-    # Load data
-    dataPath = os.path.join("..", "NewShadowTraining")
-    trainingDf = {}
-    trainingDf_synergy = {}
-    meeker = {}
+dataPath = args.data_path
+modelPath = args.model_path
+modelName = args.model_name
+inputStruct = args.input_struct
 
-    dataPath_s = os.path.join(dataPath, 'Shadow5', 'testing')
+# Create the Model
+model = USIM.load(os.path.join(modelPath, modelName))
 
-    ## Find CSV
-    csvList = glob.glob(os.path.join(dataPath_s, '*.csv'))
-    if len(csvList) != 1:
-        raise FileExistsError(f"Was expecting 1 csv file in {dataPath_s}, but found {len(csvList)}.")
-    trainingDf = pd.read_csv(csvList[0], index_col=0)
+# Load data
+trainingDf = {}
+trainingDf_synergy = {}
+meeker = {}
 
-    if 'rh_WRJ1' in trainingDf.columns:
-        trainingDf = trainingDf.drop(columns=['rh_WRJ1'])
-    if 'rh_WRJ2' in trainingDf.columns:
-        trainingDf = trainingDf.drop(columns=['rh_WRJ2'])
+dataPath_s = os.path.join(dataPath, inputStruct, 'testing')
 
-    meeker = MeekerObject(shadowHandStruct, ['rh_WRJ1', 'rh_WRJ2'])
-    
-    trainingDf_synergy = trainingDf.apply(meeker.forwardProject, axis=1)
+## Find CSV
+csvList = glob.glob(os.path.join(dataPath_s, '*.csv'))
+if len(csvList) != 1:
+    raise FileExistsError(f"Was expecting 1 csv file in {dataPath_s}, but found {len(csvList)}.")
+trainingDf = pd.read_csv(csvList[0], index_col=0)
 
-    ## Get list of imagesencoder_loss.append(l)
-    imgList = glob.glob(os.path.join(dataPath_s, '*.png'))
-    tempimg = imgList[0]
+if 'rh_WRJ1' in trainingDf.columns:
+    trainingDf = trainingDf.drop(columns=['rh_WRJ1'])
+if 'rh_WRJ2' in trainingDf.columns:
+    trainingDf = trainingDf.drop(columns=['rh_WRJ2'])
 
-    number_pattern = '([0-9]+)'
-    for numberIndex in re.finditer(number_pattern, tempimg):
-        pass
-    #numberIndex = next(re.finditer(number_pattern, tempimg))
-    number_start, number_end = numberIndex.start(0), numberIndex.end(0)
+meeker = MeekerObject(shadowHandStruct, ['rh_WRJ1', 'rh_WRJ2'])
 
-    img_start = tempimg[0:number_start]
-    img_end = tempimg[number_end:]
-    img_number_length = number_end - number_start
+trainingDf_synergy = trainingDf.apply(meeker.forwardProject, axis=1)
 
-    ## Check that number of images match length of csv file
-    if len(trainingDf) != len(imgList):
-        raise IndexError(f"Expected sizes to be the same, but got {trainingDf.shape} for csv shape and {len(imgList)} for number of images.")
+## Get list of imagesencoder_loss.append(l)
+imgList = glob.glob(os.path.join(dataPath_s, '*.png'))
+tempimg = imgList[0]
 
-    ## Iterate over each
-    for model_struct in model.decoder.keys():
-        synergy_list = []
-        joint_list = []
-        if 'human' in model_struct.lower():
-            meeker_struct = MeekerObject(humanHandStruct, ['rh_WRJ1', 'rh_WRJ2'])
-        elif 'shadow5' in model_struct.lower():
-            meeker_struct = MeekerObject(shadowHandStruct, ['rh_WRJ1', 'rh_WRJ2'])
-        elif 'shadow4' in model_struct.lower():
-            meeker_struct = MeekerObject(shadow4HandStruct)
-        elif 'shadow3' in model_struct.lower():
-            meeker_struct = MeekerObject(shadow3HandStruct)
+number_pattern = '([0-9]+)'
+for numberIndex in re.finditer(number_pattern, tempimg):
+    pass
+#numberIndex = next(re.finditer(number_pattern, tempimg))
+number_start, number_end = numberIndex.start(0), numberIndex.end(0)
 
-        jcols = meeker_struct.joint_col
+img_start = tempimg[0:number_start]
+img_end = tempimg[number_end:]
+img_number_length = number_end - number_start
 
-        for index in range(len(imgList)):
-            joint = trainingDf.iloc[index]
-            joint = np.reshape(joint.values, (1, -1))
+## Check that number of images match length of csv file
+if len(trainingDf) != len(imgList):
+    raise IndexError(f"Expected sizes to be the same, but got {trainingDf.shape} for csv shape and {len(imgList)} for number of images.")
 
-            synergy = trainingDf_synergy.iloc[index]
-            scols = synergy.index
-            synergy = np.reshape(synergy.values, (1, -1))
+## Iterate over each
+for model_struct in model.decoder.keys():
+    synergy_list = []
+    joint_list = []
+    if 'human' in model_struct.lower():
+        meeker_struct = MeekerObject(humanHandStruct, ['rh_WRJ1', 'rh_WRJ2'])
+    elif 'shadow5' in model_struct.lower():
+        meeker_struct = MeekerObject(shadowHandStruct, ['rh_WRJ1', 'rh_WRJ2'])
+    elif 'shadow4' in model_struct.lower():
+        meeker_struct = MeekerObject(shadow4HandStruct)
+    elif 'shadow3' in model_struct.lower():
+        meeker_struct = MeekerObject(shadow3HandStruct)
 
-            image =cv2.imread(img_start+str(index).zfill(img_number_length) +img_end, cv2.IMREAD_UNCHANGED)
-            image = cv2.resize(image, (224, 224))
-            image = np.reshape(image, (1, 224, 224, 1))
-            image = image.astype(np.float64)
+    jcols = meeker_struct.joint_col
 
-            predict = model(image, model_struct)
-            joint_pred = pd.Series(np.reshape(predict[0], (-1,)), jcols)
-            joint_list.append(joint_pred)
-            synergy_pred = pd.Series(np.reshape(predict[1], (-1,)), scols)
-            synergy_list.append(synergy_pred)
-            
+    for index in range(len(imgList)):
+        joint = trainingDf.iloc[index]
+        joint = np.reshape(joint.values, (1, -1))
 
-        synergy_df = pd.concat(synergy_list, axis=1,ignore_index=True)
-        synergy_df.T.to_csv(f"posttesting_Shadow5In_{model_struct}Out_encoder.csv")
+        synergy = trainingDf_synergy.iloc[index]
+        scols = synergy.index
+        synergy = np.reshape(synergy.values, (1, -1))
 
-        joint_df = pd.concat(joint_list, axis=1,ignore_index=True)
-        joint_df = joint_df.T.apply(meeker.denormalize, axis=1)
-        joint_df.to_csv(f"posttesting_Shadow5In_{model_struct}Out_decoder.csv")
+        image =cv2.imread(img_start+str(index).zfill(img_number_length) +img_end, cv2.IMREAD_UNCHANGED)
+        image = cv2.resize(image, (224, 224))
+        image = np.reshape(image, (1, 224, 224, 1))
+        image = image.astype(np.float64)
 
-if __name__ == '__main__':
-    main()
+        predict = model(image, model_struct)
+        joint_pred = pd.Series(np.reshape(predict[0], (-1,)), jcols)
+        joint_list.append(joint_pred)
+        synergy_pred = pd.Series(np.reshape(predict[1], (-1,)), scols)
+        synergy_list.append(synergy_pred)
+        
+
+    synergy_df = pd.concat(synergy_list, axis=1,ignore_index=True)
+    synergy_df.T.to_csv(os.path.join(modelPath, f"posttesting_{inputStruct}In_{model_struct}Out_encoder.csv"))
+
+    joint_df = pd.concat(joint_list, axis=1,ignore_index=True)
+    joint_df = joint_df.T.apply(meeker.denormalize, axis=1)
+    joint_df.to_csv(os.path.join(modelPath, f"posttesting_{inputStruct}In_{model_struct}Out_decoder.csv"))

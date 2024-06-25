@@ -10,11 +10,13 @@ from tensorflow.keras.losses import MeanSquaredError
 from tensorflow.keras.metrics import RootMeanSquaredError
 
 import os
+import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
+# Constants
 STRUCT_LIST = {
     'Human': humanHandStruct,
     'Shadow5': shadowHandStruct,
@@ -29,7 +31,22 @@ BAD_JOINTS = {
     'Shadow3': None
 }
 
-structs = ['Shadow5', 'Shadow4', 'Shadow3', 'Human']
+# Read Arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('--data_path', help='Path to the data folder')
+parser.add_argument('--structs', nargs='+', help='List of structures to train on')
+parser.add_argument('--save_path', help='Path to save the model', default='.')
+parser.add_argument('--model_name', help='Name of the model', default='model')
+parser.add_argument('--epochs', '-e', help='Number of epochs to train', default=200)
+parser.add_argument('--batch', '-b', help='Batch size', default=15)
+args = parser.parse_args()
+
+structs = args.structs
+dataPath = args.data_path
+epoch = args.epochs
+batch = args.batch
+save_path = args.save_path
+model_name = args.model_name
 
 # Create the Model
 model = USIM(imageSize, latentSize, EncoderModel())
@@ -50,26 +67,22 @@ for s in structs:
         key_list.append('Shadow3')
 
 # Load data
-dataPath = os.path.join("..", "NewShadowTraining")
 trainingObjects = {}
 
 for s in key_list:
     trainingObjects[s] = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'training'), STRUCT_LIST[s], BAD_JOINTS[s])
 
 # Training Loop
-MAXEPOCHS_PRE = 200
-MAXBATCH_PRE = 15
-
 model.initialize()
 optimizer = Adam(0.0005)
 optimizer.build(model.getAllTrainable())
 loss_fn = MeanSquaredError()
 metric_fn = RootMeanSquaredError() 
 metric = {k:[] for k in key_list}
-for epoch in range(MAXEPOCHS_PRE):
+for epoch in range(epoch):
     for key in key_list:
         print(f"Starting Epoch {epoch} on set {key}")
-        for df, syn, img, _ in trainingObjects[key].randomSample(MAXBATCH_PRE):
+        for df, syn, img, _ in trainingObjects[key].randomSample(batch):
             # Convert df to matrix
             joint = tf.convert_to_tensor(df.values)
             synergy = tf.convert_to_tensor(syn.values)
@@ -116,14 +129,14 @@ for s in key_list:
     joint_df.to_csv(f"allTogether_{s}_decoder.csv")
 
 # Plot Training Progress
-t_pre = np.arange(0, MAXEPOCHS_PRE)
+t_pre = np.arange(0, epoch)
 
 plt.figure()
 plt.axes()
 for key in key_list:
     plt.plot(t_pre, metric[key], label=key)
 plt.legend()
-plt.savefig('allTogether.png')
+plt.savefig(os.path.join(save_path, 'model_loss.png'))
 
 # Save Model
-model.save('model',save_format='tf')
+model.save(os.path.join(save_path, model_name),save_format='tf')
