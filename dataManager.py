@@ -36,8 +36,11 @@ class SynergyDataManager():
         # Get image string
         tempimg = glob.glob(os.path.join(dataPath, '*.png'))[0]
         number_pattern = '([0-9]+)'
+        numberIndex = None
         for numberIndex in re.finditer(number_pattern, tempimg):
             pass
+        if numberIndex is None:
+            raise ValueError(f"Could not find number in {tempimg}")
         number_start, number_end = numberIndex.start(0), numberIndex.end(0)
         
         img_start = tempimg[0:number_start]
