@@ -96,7 +96,6 @@ for epoch in range(epoch):
     tf.keras.backend.clear_session()
 
 # Load data
-dataPath = os.path.join("..", "NewShadowTraining")
 testingObject = None
 
 for s in key_list:
