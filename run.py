@@ -1,8 +1,7 @@
+from constants import *
 from main import USIM, train_step
 from dataManager import SynergyDataManager
 from modelLayers import EncoderModel, AngleDecoderModel, imageSize, latentSize, jointCounts
-
-from dataManipulation.MymeekerStructure import humanHandStruct, shadowHandStruct, shadow4HandStruct, shadow3HandStruct
 
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
@@ -15,21 +14,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
-# Constants
-STRUCT_LIST = {
-    'Human': humanHandStruct,
-    'Shadow5': shadowHandStruct,
-    'Shadow4': shadow4HandStruct,
-    'Shadow3': shadow3HandStruct
-}
-
-BAD_JOINTS = {
-    'Human': ['rh_WRJ1', 'rh_WRJ2'],
-    'Shadow5': ['rh_WRJ1', 'rh_WRJ2'],
-    'Shadow4': None,
-    'Shadow3': None
-}
 
 # Read Arguments
 parser = argparse.ArgumentParser()

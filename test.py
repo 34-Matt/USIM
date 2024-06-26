@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from main import USIM
-from dataManager import DataManager
+from dataManager import SynergyDataManager
 
 from dataManipulation.MymeekerStructure import MeekerObject, humanHandStruct, shadowHandStruct, shadow4HandStruct, shadow3HandStruct, allegroHandStruct
 
@@ -29,6 +29,10 @@ inputStruct = args.input_struct
 model = USIM.load(os.path.join(modelPath, modelName))
 
 # Load data
+trainingObjects = {}
+
+for s in model.decoder.keys():
+    trainingObjects[s] = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'testing'), STRUCT_LIST[s], BAD_JOINTS[s])
 trainingDf = {}
 trainingDf_synergy = {}
 meeker = {}
