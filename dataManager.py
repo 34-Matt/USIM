@@ -5,12 +5,12 @@ import glob
 import numpy as np
 import pandas as pd
 
-from typing import Tuple, List
+from typing import Tuple, List, Generator
 
 from dataManipulation.MymeekerStructure import MeekerObject
 
 class SynergyDataManager():
-    def __init__(self, img_size: Tuple[int], dataPath: str, structs: str, badJoints: list=None):
+    def __init__(self, img_size: Tuple[int], dataPath: str, structs: str):
         '''Initializes the DataManager
 
         Args:
@@ -21,16 +21,25 @@ class SynergyDataManager():
         self.img_size = img_size
         self.dataPath = dataPath
         self.structs = structs
+        
+        # Load Joint
+        path_csv = glob.glob(os.path.join(dataPath, '*.csv'))
+        if len(path_csv) != 1:
+            raise FileNotFoundError(f"Expected 1 csv file in {dataPath}, but found {len(path_csv)}")
+        self.jointDf = pd.read_csv(path_csv[0], index_col=0)
+        
+        badJoints = []
+        if 'rh_WRJ1' in self.jointDf.columns:
+            self.jointDf = self.jointDf.drop(columns=['rh_WRJ1'])
+            badJoints.append('rh_WRJ1')
+        if 'rh_WRJ2' in self.jointDf.columns:
+            self.jointDf = self.jointDf.drop(columns=['rh_WRJ2']) 
+            badJoints.append('rh_WRJ2')
 
         # Load meeker object
         self.meeker = MeekerObject(structs, badJoints)
 
-        # Read csv
-        path_csv = glob.glob(os.path.join(dataPath, '*.csv'))
-        if len(path_csv) != 1:
-            raise FileNotFoundError(f"Expected 1 csv file in {dataPath}, but found {len(path_csv)}")
-        
-        self.jointDf = pd.read_csv(path_csv[0], index_col=0)
+        # Create Synergy
         self.synergyDf = self.jointDf.apply(self.meeker.forwardProject, axis=1)
 
         # Get image string
@@ -56,27 +65,36 @@ class SynergyDataManager():
         
         self.sample_count = img_count
 
-    def randomSample(self, batchSize: int) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, List[int]]:
+    def randomSample(self, batchSize: int) -> Generator[Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, List[int]], None, None]:
         '''Generates a random sample of the data
         
         Args:
             batchSize [int]: The size of the batch to generate
             
-        Returns:
+        Yields:
             jointDf [DataFrame]: The joint data
             synergyDf [DataFrame]: The synergy data
             img [ndarray]: The image data
             indices [List[int]]: The indices of the data
         '''
-        indices = np.random.choice(self.sample_count, batchSize)
-        jointDf = self.jointDf.iloc[indices]
-        synergyDf = self.synergyDf.iloc[indices]
+        # Shuffle the indices
+        indices = np.arange(self.sample_count)
+        np.random.shuffle(indices)
+        current_offset = 0
 
-        img = np.zeros((batchSize, *self.img_size))
-        for i, index in enumerate(indices):
-            img[i] = cv2.imread(self.img_str.format(index), cv2.IMREAD_UNCHANGED)
+        # Iterate over samples of batchSizes
+        while len(indices) - current_offset >= batchSize:
+            cur_indices = indices[current_offset:current_offset+batchSize]
+            current_offset += batchSize
 
-        return jointDf, synergyDf, img, indices
+            jointDf = self.jointDf.iloc[cur_indices]
+            synergyDf = self.synergyDf.iloc[cur_indices]
+
+            image = np.zeros((batchSize, *self.img_size))
+            for i, index in enumerate(cur_indices):
+                image[i,:,:,:] = self.__getImage(index)
+
+            yield jointDf, synergyDf, image, cur_indices
     
     def getSample(self, indices: List[int]) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray]:
         '''Gets a specific sample of the data
@@ -94,7 +112,18 @@ class SynergyDataManager():
 
         img = np.zeros((len(indices), *self.img_size))
         for i, index in enumerate(indices):
-            img[i] = cv2.imread(self.img_str.format(index), cv2.IMREAD_UNCHANGED)
+            img[i,:,:,:] = self.__getImage(index)
 
         return jointDf, synergyDf, img
         
+    def __getImage(self, index:int) -> np.ndarray:
+        img = cv2.imread(self.img_str.format(index), cv2.IMREAD_UNCHANGED)
+        if len(img.shape) == len(self.img_size):
+            img = cv2.resize(img,self.img_size)
+        elif len(img.shape) == 2 and len(self.img_size) == 3:
+            img = cv2.resize(img, self.img_size[:2])
+            img = img.reshape(self.img_size)
+        else:
+            raise IndexError(f"Not sure what to do with image size of {img.shape} when mapping to size {self.img_size}")
+        
+        return img

@@ -210,7 +210,7 @@ class USIM(tf.keras.Model):
         return model
 
 
-#@tf.function
+@tf.function
 def train_step(
     model: "USIM",
     decoder_name: str,
@@ -245,8 +245,6 @@ def train_step(
     # Begin tracking gradient
     with tf.GradientTape() as tape:
         logits = model(x, decoder_name=decoder_name, training=True)
-        #ys = tf.concat(y,1)
-        #ls = tf.concat(logits,1)
         
         loss = loss_fn(y[0], logits[0], sample_weight=weight)
         loss += loss_fn(y[1], logits[1], sample_weight=weight)

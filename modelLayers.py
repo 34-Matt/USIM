@@ -95,7 +95,7 @@ class AngleDecoderModel(Model):
         self.decode1 = Dense(5, LeakyReLU())
         self.decode2 = Dense(output_size, activations.sigmoid)
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         x = self.decode1(inputs)
         x = self.decode2(x)
         return x
