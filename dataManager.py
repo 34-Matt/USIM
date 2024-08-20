@@ -7,6 +7,7 @@ import pandas as pd
 
 from typing import Tuple, List, Generator
 
+import imageTools
 from dataManipulation.MymeekerStructure import MeekerObject
 
 class SynergyDataManager():
@@ -65,11 +66,12 @@ class SynergyDataManager():
         
         self.sample_count = img_count
 
-    def randomSample(self, batchSize: int) -> Generator[Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, List[int]], None, None]:
+    def randomSample(self, batchSize: int, noise: bool=False) -> Generator[Tuple[pd.DataFrame, pd.DataFrame, np.ndarray, List[int]], None, None]:
         '''Generates a random sample of the data
         
         Args:
             batchSize [int]: The size of the batch to generate
+            noise [bool]: Whether to apply noise or not
             
         Yields:
             jointDf [DataFrame]: The joint data
@@ -92,15 +94,16 @@ class SynergyDataManager():
 
             image = np.zeros((batchSize, *self.img_size))
             for i, index in enumerate(cur_indices):
-                image[i,:,:,:] = self.__getImage(index)
+                image[i,:,:,:] = self.__getImage(index, noise)
 
             yield jointDf, synergyDf, image, cur_indices
     
-    def getSample(self, indices: List[int]) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray]:
+    def getSample(self, indices: List[int], noise: bool=False) -> Tuple[pd.DataFrame, pd.DataFrame, np.ndarray]:
         '''Gets a specific sample of the data
-        
+        matrix[matrix > saltprob] = 1
         Args:
             indices [List[int]]: The indices of the data
+            noise [bool]: Whether to apply noise or not
             
         Returns:
             jointDf [DataFrame]: The joint data
@@ -112,12 +115,15 @@ class SynergyDataManager():
 
         img = np.zeros((len(indices), *self.img_size))
         for i, index in enumerate(indices):
-            img[i,:,:,:] = self.__getImage(index)
+            img[i,:,:,:] = self.__getImage(index, noise)
 
         return jointDf, synergyDf, img
         
-    def __getImage(self, index:int) -> np.ndarray:
+    def __getImage(self, index:int, noise:bool) -> np.ndarray:
+        # Load image
         img = cv2.imread(self.img_str.format(index), cv2.IMREAD_UNCHANGED)
+        
+        # Reshape image
         if len(img.shape) == len(self.img_size):
             img = cv2.resize(img,self.img_size)
         elif len(img.shape) == 2 and len(self.img_size) == 3:
@@ -125,5 +131,21 @@ class SynergyDataManager():
             img = img.reshape(self.img_size)
         else:
             raise IndexError(f"Not sure what to do with image size of {img.shape} when mapping to size {self.img_size}")
-        
+
+        img = (img - np.min(img)) / (np.max(img) - np.min(img))
+        # Apply random noise to the data
+        if noise:
+            ## Random shifting
+            x = 20 * np.random.sample() - 10
+            y = 20 * np.random.sample() - 10
+            theta = np.random.sample() * np.pi/36 # 5 degree
+
+            transform = imageTools.get_translation(x, y, theta)
+            img[:,:,0] = cv2.warpAffine(img[:,:,0], transform, img.shape[0:2])
+
+            ## Gaussian
+            noise = imageTools.create_gaussian(img.shape, 0.001)
+            img += noise
+            img = np.clip(img, 0, 1)
+
         return img

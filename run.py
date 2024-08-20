@@ -67,7 +67,7 @@ for e in range(epoch):
     for key in key_list:
         batch_count = 0
         print(f"Starting Epoch {e} on set {key}")
-        for df, syn, img, _ in trainingObjects[key].randomSample(batch):
+        for df, syn, img, _ in trainingObjects[key].randomSample(batch, True):
             # Convert df to matrix
             joint = tf.convert_to_tensor(df.values)
             synergy = tf.convert_to_tensor(syn.values)

@@ -49,7 +49,7 @@ for model_struct in model.decoder.keys():
     jcols = meeker_struct.joint_col
 
     for index in range(trainingObjects.sample_count):
-        joint, synergy, image = trainingObjects.getSample([index])
+        joint, synergy, image = trainingObjects.getSample([index], False)
 
         predict = model(image, decoder_name=model_struct)
 
@@ -57,7 +57,6 @@ for model_struct in model.decoder.keys():
         joint_list.append(joint_pred)
         synergy_pred = pd.Series(np.reshape(predict[1], (-1,)), SYNERGY_COL)
         synergy_list.append(synergy_pred)
-        
 
     synergy_df = pd.concat(synergy_list, axis=1,ignore_index=True)
     synergy_df.T.to_csv(os.path.join(modelPath, f"posttesting_{inputStruct}In_{model_struct}Out_encoder.csv"))
