@@ -1,0 +1,5 @@
+regex
+opencv-python
+numpy
+pandas
+tensorflow
