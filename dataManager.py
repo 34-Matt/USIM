@@ -43,6 +43,9 @@ class SynergyDataManager():
         # Create Synergy
         self.synergyDf = self.jointDf.apply(self.meeker.forwardProject, axis=1)
 
+        # Normalize the Joint Dataframe
+        self.jointDf = self.jointDf.apply(self.meeker.normalize, axis=1)
+
         # Get image string
         tempimg = glob.glob(os.path.join(dataPath, '*.png'))[0]
         number_pattern = '([0-9]+)'
