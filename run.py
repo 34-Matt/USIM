@@ -5,7 +5,7 @@ from modelLayers import EncoderModel, AngleDecoderModel, imageSize, latentSize, 
 
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses import MeanSquaredError
+from tensorflow.keras.losses import MeanSquaredError, CosineSimilarity
 from tensorflow.keras.metrics import RootMeanSquaredError
 
 import os
@@ -61,7 +61,10 @@ model.initialize()
 optimizer = Adam(0.0005)
 optimizer.build(model.getAllTrainable())
 loss_fn = MeanSquaredError()
-metric_fn = RootMeanSquaredError() 
+#loss_fn2 = CosineSimilarity()
+loss_fn2 = None
+metric_fn = RootMeanSquaredError()
+alpha = lambda x: 2 - np.exp(0.003*x)
 metric = {k:[] for k in key_list}
 for e in range(epoch):
     for key in key_list:
@@ -70,11 +73,11 @@ for e in range(epoch):
         for df, syn, img, _ in trainingObjects[key].randomSample(batch, True):
             # Convert df to matrix
             joint = tf.convert_to_tensor(df.values)
-            synergy = tf.convert_to_tensor(syn.values)
+            synergy = tf.convert_to_tensor(syn.values, dtype=tf.float32)
             weight = (3 - np.sum(syn.values, axis=1)) / 3 + 0.01
 
             #Train on Data
-            loss = train_step(model, key, img, [joint, synergy], optimizer, loss_fn, metric_fn, weight)
+            loss = train_step(model, key, img, [joint, synergy], optimizer, loss_fn, loss_fn2, alpha = alpha(e), metric_fn=metric_fn, weight=weight)
             #print(f"Trained batch {batch_count} with a loss of {loss}")
             batch_count += 1
             #hist = model.train_on_batch(image, [joint, synergy], return_dict=True)

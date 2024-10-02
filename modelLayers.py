@@ -1,10 +1,12 @@
 from tensorflow.keras.layers import Dense, LeakyReLU, \
     Dropout, GlobalAveragePooling2D, Concatenate
+import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.applications import ResNet50
-#from tensorflow.keras.regularizers import l2
+from tensorflow.keras.regularizers import l1, Regularizer
 from tensorflow.keras import activations
-
+#from tensorflow.keras.initializers import Ones
+import numpy as np
 
 # Tools for machine learning
 imageSize = (224,224,1)
@@ -38,6 +40,19 @@ jointCounts = {
     'Shadow4': len(shadow4Cols),
     'Shadow3': len(shadow3Cols)
 }
+
+class MyOrthogonality(Regularizer):
+    def __init__(self, weight):
+        self.weight = weight
+
+    def __call__(self, x):
+        x_orth = tf.transpose(x) @ x
+        x_loss = x_orth * (1 - tf.eye(*x_orth.shape))
+        loss = tf.sqrt(tf.reduce_sum(tf.square(x_loss)))
+        return self.weight * loss
+    
+    def get_config(self):
+        return {'weight': float(self.weight)}
 
 class EncoderModel(Model):
     def __init__(self, *args, **kwargs):
@@ -87,18 +102,25 @@ class EncoderModel(Model):
         x = self.encode9(x)
 
         return x
-
+    
+    def get_loss(self):
+        return 0
 
 class AngleDecoderModel(Model):
     def __init__(self, output_size, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.decode1 = Dense(5, LeakyReLU())
-        self.decode2 = Dense(output_size, activations.sigmoid)
+        self.decode2 = Dense(output_size, activations.sigmoid,  use_bias=False, kernel_initializer='ones') #kernel_regularizer=MyOrthogonality(0.001),
 
     def call(self, inputs, training=False):
         x = self.decode1(inputs)
         x = self.decode2(x)
+        #x = self.decode2(inputs)
         return x
+    
+    def get_loss(self):
+        return 0
+        #return sum(self.decode2.losses)
 
 
 def createHumanJointDecoder():
