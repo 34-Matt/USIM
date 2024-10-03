@@ -1,8 +1,5 @@
 import os
-import cv2
-import glob
 import argparse
-import regex as re
 import numpy as np
 import pandas as pd
 
@@ -11,7 +8,7 @@ from dataManager import SynergyDataManager
 from modelLayers import imageSize
 from constants import STRUCT_LIST
 
-from dataManipulation.MymeekerStructure import MeekerObject, SYNERGY_COL, humanHandStruct, shadowHandStruct, shadow4HandStruct, shadow3HandStruct, allegroHandStruct
+from dataManipulation.MymeekerStructure import MeekerObject, SYNERGY_COL, humanHandStruct, shadowHandStruct, shadow4HandStruct, shadow3HandStruct #, allegroHandStruct
 
 
 # Read Arguments
@@ -34,7 +31,7 @@ model = USIM.load(os.path.join(modelPath, modelName))
 trainingObjects = SynergyDataManager(imageSize, os.path.join(dataPath, inputStruct, 'testing'), STRUCT_LIST[inputStruct])
 
 ## Iterate over each
-for model_struct in model.decoder.keys():
+for model_struct in model.decoder:
     synergy_list = []
     joint_list = []
     if 'human' in model_struct.lower():
@@ -45,6 +42,8 @@ for model_struct in model.decoder.keys():
         meeker_struct = MeekerObject(shadow4HandStruct)
     elif 'shadow3' in model_struct.lower():
         meeker_struct = MeekerObject(shadow3HandStruct)
+    else:
+        raise ValueError(f"Unknown model structure: {model_struct}")
 
     jcols = meeker_struct.joint_col
 

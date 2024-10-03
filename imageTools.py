@@ -1,4 +1,3 @@
-import cv2
 import numpy as np
 
 from typing import Tuple
@@ -42,7 +41,8 @@ def create_gaussian(shape:Tuple[int], var:float=0.5) -> np.ndarray:
     return np.clip(matrix, -1, 1)
 
 def create_saltpepper(shape:Tuple[int], saltprob: float, pepperprob: float) -> np.ndarray:
-    '''Generates a matrix with salt [1] and pepper[-1] noise
+    '''Generates a matrix with salt [1] and pepper[-1] noise, or no noise [0]
+    Note that when the sum of saltprob and pepperprob is greater than 1, pepper noise will override salt noise.
     
     Args:
         shape (Tuple[int]): The matrix shape for the salt and pepper noise
@@ -52,8 +52,7 @@ def create_saltpepper(shape:Tuple[int], saltprob: float, pepperprob: float) -> n
     Returns:
         matrix (np.ndarray): The noise matrix
     '''
-    matrix = np.random.uniform(-1, 1, shape)
-    matrix[(matrix < saltprob) and (matrix > -pepperprob)] = 0
+    matrix = np.zeros(shape)
     matrix[matrix > saltprob] = 1
     matrix[matrix < -pepperprob] = -1
     return matrix

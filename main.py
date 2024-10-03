@@ -103,7 +103,7 @@ class USIM(tf.keras.Model):
         '''
         if decoder_name is None:
             raise ValueError('Decoder name is required to call the model')
-        Latent = self.encoder.call(inputs, training=training)
+        Latent = self.encoder.call(inputs, training=training, mask=mask)
         Prediction = self.decoder[decoder_name].call(Latent, training=training)
         return [Prediction, Latent]
 
@@ -148,11 +148,12 @@ class USIM(tf.keras.Model):
         loss = 0
         if decoder is None:
             for d in self.decoder:
-                loss += self.decoder.get_loss()
+                loss += d.get_loss()
         else:
             loss = self.decoder[decoder].get_loss()
         return loss
 
+    #pylint: disable=too-many-arguments
     def save(
             self,
             filepath: Any,
@@ -198,6 +199,7 @@ class USIM(tf.keras.Model):
         with open(os.path.join(filepath, 'param.pickle'), 'wb') as f:
             pickle.dump((self.input_size, self.latent_size), f)
 
+    #pylint: disable=too-many-arguments
     @staticmethod
     def load(filepath:str):
         '''Loads a USIM model from a file

@@ -3,10 +3,10 @@ from tensorflow.keras.layers import Dense, LeakyReLU, \
 import tensorflow as tf
 from tensorflow.keras import Model
 from tensorflow.keras.applications import ResNet50
-from tensorflow.keras.regularizers import l1, Regularizer
+from tensorflow.keras.regularizers import Regularizer #,l1
 from tensorflow.keras import activations
 #from tensorflow.keras.initializers import Ones
-import numpy as np
+
 
 # Tools for machine learning
 imageSize = (224,224,1)
@@ -112,6 +112,7 @@ class AngleDecoderModel(Model):
         self.decode1 = Dense(5, LeakyReLU())
         self.decode2 = Dense(output_size, activations.sigmoid,  use_bias=False, kernel_initializer='ones') #kernel_regularizer=MyOrthogonality(0.001),
 
+    # pylint: disable=unused-argument
     def call(self, inputs, training=False):
         x = self.decode1(inputs)
         x = self.decode2(x)
