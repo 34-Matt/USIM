@@ -153,7 +153,6 @@ class USIM(tf.keras.Model):
             loss = self.decoder[decoder].get_loss()
         return loss
 
-    #pylint: disable=too-many-arguments
     def save(
             self,
             filepath: Any,
@@ -221,7 +220,6 @@ class USIM(tf.keras.Model):
         return model
 
 
-#pylint: disable=too-many-arguments
 @tf.function
 def train_step(
     model: "USIM",

@@ -108,7 +108,8 @@ disable=
     import-error,
     C0411,
     R0913,
-    R0902
+    R0902,
+    R0917
 
 [SIMILARITIES]
 
