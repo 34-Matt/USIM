@@ -143,6 +143,16 @@ class USIM(tf.keras.Model):
         for decoder in self.decoder.values():
             decoder(temp_latent)
 
+    def get_loss(self, decoder:str = None) -> float:
+        '''Gets the internal losses to individual encoder and decoders'''
+        loss = 0
+        if decoder is None:
+            for d in self.decoder:
+                loss += self.decoder.get_loss()
+        else:
+            loss = self.decoder[decoder].get_loss()
+        return loss
+
     def save(
             self,
             filepath: Any,
@@ -210,14 +220,16 @@ class USIM(tf.keras.Model):
         return model
 
 
-#@tf.function
+@tf.function
 def train_step(
     model: "USIM",
     decoder_name: str,
     x: tf.Tensor,
     y: Tuple[tf.Tensor, tf.Tensor],
     optimizer: Union[str, tf.keras.optimizers.Optimizer],
-    loss_fn: Union[str, tf.keras.losses.Loss],
+    loss_fn1: Union[str, tf.keras.losses.Loss],
+    loss_fn2: Union[str, tf.keras.losses.Loss] = None,
+    alpha: float = 1.0,
     metric_fn: tf.keras.metrics.Metric = None,
     weight = None
 ) -> float:
@@ -239,17 +251,22 @@ def train_step(
     if isinstance(optimizer, str):
         optimizer = tf.keras.optimizers.get(optimizer)
     
-    if isinstance(loss_fn, str):
-        loss_fn = tf.keras.losses.get(loss_fn)
+    if isinstance(loss_fn1, str):
+        loss_fn1 = tf.keras.losses.get(loss_fn1)
+        
+    if isinstance(loss_fn2, str):
+        loss_fn2 = tf.keras.losses.get(loss_fn2)
 
     # Begin tracking gradient
     with tf.GradientTape() as tape:
         logits = model(x, decoder_name=decoder_name, training=True)
-        #ys = tf.concat(y,1)
-        #ls = tf.concat(logits,1)
         
-        loss = loss_fn(y[0], logits[0], sample_weight=weight)
-        loss += loss_fn(y[1], logits[1], sample_weight=weight)
+        loss = loss_fn1(y[0], logits[0], sample_weight=weight)
+        if loss_fn2 is None:
+            loss += tf.multiply(tf.cast(alpha, tf.float32), loss_fn1(y[1], logits[1], sample_weight=weight))
+        else:
+            loss +=  tf.multiply(tf.cast(alpha, tf.float32), loss_fn2(y[1], logits[1], sample_weight=weight))
+        loss += model.get_loss(decoder_name)
 
     # Apply the gradient:
     weights = model.getTrainable(decoder_name)

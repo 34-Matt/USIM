@@ -5,7 +5,7 @@ from modelLayers import EncoderModel, AngleDecoderModel, imageSize, latentSize, 
 
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses import MeanSquaredError
+from tensorflow.keras.losses import MeanSquaredError, CosineSimilarity
 from tensorflow.keras.metrics import RootMeanSquaredError
 
 import os
@@ -17,11 +17,11 @@ import matplotlib.pyplot as plt
 
 # Read Arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', help='Path to the data folder')
-parser.add_argument('--structs', nargs='+', help='List of structures to train on')
+parser.add_argument('data_path', help='Path to the data folder')
+parser.add_argument('structs', nargs='+', help='List of structures to train on')
 parser.add_argument('--save_path', help='Path to save the model', default='.')
 parser.add_argument('--model_name', help='Name of the model', default='model')
-parser.add_argument('--epochs', '-e', help='Number of epochs to train', default=200)
+parser.add_argument('--epochs', '-e', help='Number of epochs to train', type=int, default=200)
 parser.add_argument('--batch', '-b', help='Batch size', default=15)
 args = parser.parse_args()
 
@@ -54,26 +54,32 @@ for s in structs:
 trainingObjects = {}
 
 for s in key_list:
-    trainingObjects[s] = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'training'), STRUCT_LIST[s], BAD_JOINTS[s])
+    trainingObjects[s] = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'training'), STRUCT_LIST[s])
 
 # Training Loop
 model.initialize()
 optimizer = Adam(0.0005)
 optimizer.build(model.getAllTrainable())
 loss_fn = MeanSquaredError()
-metric_fn = RootMeanSquaredError() 
+#loss_fn2 = CosineSimilarity()
+loss_fn2 = None
+metric_fn = RootMeanSquaredError()
+alpha = lambda x: 2 - np.exp(0.003*x)
 metric = {k:[] for k in key_list}
-for epoch in range(epoch):
+for e in range(epoch):
     for key in key_list:
-        print(f"Starting Epoch {epoch} on set {key}")
-        for df, syn, img, _ in trainingObjects[key].randomSample(batch):
+        batch_count = 0
+        print(f"Starting Epoch {e} on set {key}")
+        for df, syn, img, _ in trainingObjects[key].randomSample(batch, True):
             # Convert df to matrix
             joint = tf.convert_to_tensor(df.values)
-            synergy = tf.convert_to_tensor(syn.values)
+            synergy = tf.convert_to_tensor(syn.values, dtype=tf.float32)
             weight = (3 - np.sum(syn.values, axis=1)) / 3 + 0.01
 
             #Train on Data
-            train_step(model, key, img, [joint, synergy], optimizer, loss_fn, metric_fn, weight)
+            loss = train_step(model, key, img, [joint, synergy], optimizer, loss_fn, loss_fn2, alpha = alpha(e), metric_fn=metric_fn, weight=weight)
+            #print(f"Trained batch {batch_count} with a loss of {loss}")
+            batch_count += 1
             #hist = model.train_on_batch(image, [joint, synergy], return_dict=True)
         metric[key].append(metric_fn.result())
         metric_fn.reset_state()
@@ -82,22 +88,26 @@ for epoch in range(epoch):
 # Load data
 testingObject = None
 
+## Create Save location if it doesn't exist
+if not os.path.exists(save_path):
+    os.mkdir(save_path)
+
 for s in key_list:
-    testingObject = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'testing'), STRUCT_LIST[s], BAD_JOINTS[s])
+    testingObject = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'testing'), STRUCT_LIST[s])
 
     ## Iterate over each
     synergy_list = []
     joint_list = []
     for index in range(testingObject.sample_count):
         joint, synergy, img, = testingObject.getSample([index])
-        jcols = joint.index
+        jcols = joint.columns
         joint = np.reshape(joint.values, (1, -1))
 
-        scols = synergy.index
+        scols = synergy.columns
         synergy = np.reshape(synergy.values, (1, -1))
         image = img.astype(np.float64)
 
-        predict = model(image, s)
+        predict = model(image, decoder_name=s)
         joint_pred = pd.Series(np.reshape(predict[0], (-1,)), jcols)
         joint_list.append(joint_pred)
         synergy_pred = pd.Series(np.reshape(predict[1], (-1,)), scols)
@@ -105,11 +115,11 @@ for s in key_list:
         
 
     synergy_df = pd.concat(synergy_list, axis=1,ignore_index=True)
-    synergy_df.T.to_csv(f"allTogether_{s}_encoder.csv")
+    synergy_df.T.to_csv(os.path.join(save_path, f"allTogether_{s}_encoder.csv"))
 
     joint_df = pd.concat(joint_list, axis=1,ignore_index=True)
     joint_df = joint_df.T.apply(testingObject.meeker.denormalize, axis=1)
-    joint_df.to_csv(f"allTogether_{s}_decoder.csv")
+    joint_df.to_csv(os.path.join(save_path, f"allTogether_{s}_decoder.csv"))
 
 # Plot Training Progress
 t_pre = np.arange(0, epoch)
