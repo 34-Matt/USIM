@@ -199,7 +199,6 @@ class USIM(tf.keras.Model):
         with open(os.path.join(filepath, 'param.pickle'), 'wb') as f:
             pickle.dump((self.input_size, self.latent_size), f)
 
-    #pylint: disable=too-many-arguments
     @staticmethod
     def load(filepath:str):
         '''Loads a USIM model from a file
@@ -222,6 +221,7 @@ class USIM(tf.keras.Model):
         return model
 
 
+#pylint: disable=too-many-arguments
 @tf.function
 def train_step(
     model: "USIM",
