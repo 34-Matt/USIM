@@ -1,11 +1,12 @@
 from constants import STRUCT_LIST
-from main import USIM, train_step
+from main import USIM
 from dataManager import SynergyDataManager
 from modelLayers import EncoderModel, AngleDecoderModel, imageSize, latentSize, jointCounts
+from customLoss import CustomLoss
 
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.losses import MeanSquaredError #, CosineSimilarity
+from tensorflow.keras.losses import MeanSquaredError, CosineSimilarity
 from tensorflow.keras.metrics import RootMeanSquaredError
 
 import os
@@ -60,9 +61,7 @@ for s in key_list:
 model.initialize()
 optimizer = Adam(0.0005)
 optimizer.build(model.getAllTrainable())
-loss_fn = MeanSquaredError()
-#loss_fn2 = CosineSimilarity()
-loss_fn2 = None
+loss_fn = CustomLoss(MeanSquaredError(), CosineSimilarity(), 0.9)
 metric_fn = RootMeanSquaredError()
 alpha = 0.9
 metric = {k:[] for k in key_list}
@@ -77,10 +76,9 @@ for e in range(epoch):
             weight = (3 - np.sum(syn.values, axis=1)) / 3 + 0.01
 
             #Train on Data
-            loss = train_step(model, key, img, [joint, synergy], optimizer, loss_fn, loss_fn2, alpha = alpha, metric_fn=metric_fn, weight=weight)
+            loss = model.train_step(key, img, [joint, synergy], optimizer, loss_fn, metric_fn=metric_fn, weight=weight)
             #print(f"Trained batch {batch_count} with a loss of {loss}")
             batch_count += 1
-            #hist = model.train_on_batch(image, [joint, synergy], return_dict=True)
         metric[key].append(metric_fn.result())
         metric_fn.reset_state()
     tf.keras.backend.clear_session()

@@ -3,8 +3,11 @@
 import os
 import pickle
 import tensorflow as tf
-
 from typing import List, Tuple, Union, Any
+
+from customLoss import CustomLoss
+
+from dataManipulation.MymeekerStructure import MeekerObject
 
 
 class USIM(tf.keras.Model):
@@ -69,18 +72,21 @@ class USIM(tf.keras.Model):
     def add_decoder(
             self,
             name: str,
-            layers: tf.keras.Model
+            layers: tf.keras.Model,
+            meeker: MeekerObject
     ) -> None:
         '''Adds a decoder to the model
         
         Args:
             name (str): A name to identify the decoder
             layers (List[Layer]): The list of layers for the decoder portion of the model
+            meeker (MeekerObject): The meeker object that is associated with the decoder
         '''
         if name in self.decoder:
             raise IndexError(f"The name {name} already exists as the decoder in the model.")
 
         self.decoder[name] = layers
+        self.decoder_meeker[name] = meeker
 
     def call(
             self,
@@ -219,62 +225,49 @@ class USIM(tf.keras.Model):
         
         return model
 
-
-@tf.function
-def train_step(
-    model: "USIM",
-    decoder_name: str,
-    x: tf.Tensor,
-    y: Tuple[tf.Tensor, tf.Tensor],
-    optimizer: Union[str, tf.keras.optimizers.Optimizer],
-    loss_fn1: Union[str, tf.keras.losses.Loss],
-    loss_fn2: Union[str, tf.keras.losses.Loss] = None,
-    alpha: float = 1.0,
-    metric_fn: tf.keras.metrics.Metric = None,
-    weight = None
-) -> float:
-    '''Trains a USIM model on a batch of data
-    
-    Args:
-        model [USIM]: The USIM model to train on
-        decoder_name [str]: The name of the decoder that is associated with this batch
-        x [Tensor]: The input to the USIM model
-        y [Tuple[Tensor, Tensor]]: The expected output of the USIM model, with the first element being the expected prediction and the second being the expected latent features
-        optimizer [Union[str, Optimizer]]: The optimizer to apply the gradient decent
-        loss_fn [Union[str, Loss]]: The loss function to implement
-        metric_fn [Metric]: The evaluation metric (default None)
-
-    Returns:
-        loss [float]: The loss value from the training
-    '''
-    # Get optimizer and loss functions if a string
-    if isinstance(optimizer, str):
-        optimizer = tf.keras.optimizers.get(optimizer)
-    
-    if isinstance(loss_fn1, str):
-        loss_fn1 = tf.keras.losses.get(loss_fn1)
+    @tf.function
+    def train_step(
+        self,
+        decoder_name: str,
+        x: tf.Tensor,
+        y: Tuple[tf.Tensor, tf.Tensor],
+        optimizer: Union[str, tf.keras.optimizers.Optimizer],
+        loss_fn: CustomLoss,
+        metric_fn: tf.keras.metrics.Metric = None,
+        weight = None
+    ) -> float:
+        '''Trains a USIM model on a batch of data
         
-    if isinstance(loss_fn2, str):
-        loss_fn2 = tf.keras.losses.get(loss_fn2)
+        Args:
+            decoder_name [str]: The name of the decoder that is associated with this batch
+            x [Tensor]: The input to the USIM model
+            y [Tuple[Tensor, Tensor]]: The expected output of the USIM model, with the first element being the expected prediction and the second being the expected latent features
+            optimizer [Union[str, Optimizer]]: The optimizer to apply the gradient decent
+            loss_fn [Union[str, Loss]]: The loss function to implement
+            metric_fn [Metric]: The evaluation metric (default None)
+            weight [Tensor]: The weight of each sample
 
-    # Begin tracking gradient
-    with tf.GradientTape() as tape:
-        logits = model(x, decoder_name=decoder_name, training=True)
+        Returns:
+            loss [float]: The loss value from the training
+        '''
+        # Get optimizer and loss functions if a string
+        if isinstance(optimizer, str):
+            optimizer = tf.keras.optimizers.get(optimizer)
         
-        loss = loss_fn1(y[0], logits[0], sample_weight=weight)
-        if loss_fn2 is None:
-            loss += tf.multiply(tf.cast(alpha, tf.float32), loss_fn1(y[1], logits[1], sample_weight=weight))
-        else:
-            loss +=  tf.multiply(tf.cast(alpha, tf.float32), loss_fn2(y[1], logits[1], sample_weight=weight))
-        loss += model.get_loss(decoder_name)
+        # Begin tracking gradient
+        with tf.GradientTape() as tape:
+            logits = self(x, decoder_name=decoder_name, training=True)
+            
+            loss = loss_fn(y, logits, sample_weight=weight)
+            loss += self.get_loss(decoder_name)
 
-    # Apply the gradient:
-    weights = model.getTrainable(decoder_name)
-    grads = tape.gradient(loss, weights)
-    optimizer.apply_gradients(zip(grads, weights))
+        # Apply the gradient:
+        weights = self.getTrainable(decoder_name)
+        grads = tape.gradient(loss, weights)
+        optimizer.apply_gradients(zip(grads, weights))
 
-    # Update metric if applicable
-    metric_fn.update_state(y[0], logits[0])
-    metric_fn.update_state(y[1], logits[1])
+        # Update metric if applicable
+        metric_fn.update_state(y[0], logits[0])
+        metric_fn.update_state(y[1], logits[1])
 
-    return loss
+        return loss
