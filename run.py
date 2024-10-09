@@ -23,7 +23,7 @@ parser.add_argument('structs', nargs='+', help='List of structures to train on')
 parser.add_argument('--save_path', help='Path to save the model', default='.')
 parser.add_argument('--model_name', help='Name of the model', default='model')
 parser.add_argument('--epochs', '-e', help='Number of epochs to train', type=int, default=200)
-parser.add_argument('--batch', '-b', help='Batch size', default=15)
+parser.add_argument('--batch', '-b', help='Batch size', type=int, default=15)
 args = parser.parse_args()
 
 structs = args.structs
@@ -74,6 +74,7 @@ for e in range(epoch):
             joint = tf.convert_to_tensor(df.values)
             synergy = tf.convert_to_tensor(syn.values, dtype=tf.float32)
             weight = (3 - np.sum(syn.values, axis=1)) / 3 + 0.01
+            weight = tf.reshape(weight, [batch, 1])
 
             #Train on Data
             loss = model.train_step(key, img, [joint, synergy], optimizer, loss_fn, metric_fn=metric_fn, weight=weight)
