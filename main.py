@@ -72,21 +72,18 @@ class USIM(tf.keras.Model):
     def add_decoder(
             self,
             name: str,
-            layers: tf.keras.Model,
-            meeker: MeekerObject
+            layers: tf.keras.Model
     ) -> None:
         '''Adds a decoder to the model
         
         Args:
             name (str): A name to identify the decoder
             layers (List[Layer]): The list of layers for the decoder portion of the model
-            meeker (MeekerObject): The meeker object that is associated with the decoder
         '''
         if name in self.decoder:
             raise IndexError(f"The name {name} already exists as the decoder in the model.")
 
         self.decoder[name] = layers
-        self.decoder_meeker[name] = meeker
 
     def call(
             self,
@@ -100,7 +97,6 @@ class USIM(tf.keras.Model):
         Args:
             inputs [Tensor]: The input to the model
             training [bool]: If the model is training or not
-            mask [Tensor]: The mask to apply to the model
             decoder_name [str]: The name of the decoder to output
         
         Returns:
@@ -109,7 +105,7 @@ class USIM(tf.keras.Model):
         '''
         if decoder_name is None:
             raise ValueError('Decoder name is required to call the model')
-        Latent = self.encoder.call(inputs, training=training, mask=mask)
+        Latent = self.encoder.call(inputs, training=training)
         Prediction = self.decoder[decoder_name].call(Latent, training=training)
         return [Prediction, Latent]
 

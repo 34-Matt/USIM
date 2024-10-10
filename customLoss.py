@@ -27,6 +27,8 @@ class CustomLoss(Loss):
         Returns:
             Tensor: The loss
         '''
+        print(self.l1(y_true[0], y_pred[0], sample_weight))
+        print(self.l2(y_true[1], y_pred[1], sample_weight))
         return self.l1(y_true[0], y_pred[0], sample_weight) + self.alpha * self.l2(y_true[1], y_pred[1], sample_weight)
     
     def get_config(self):
