@@ -158,6 +158,10 @@ class USIM(tf.keras.Model):
         else:
             loss = self.decoder[decoder].get_loss()
         return loss
+    
+    def lock_encoder(self, lock:bool = True):
+        '''Locks the encoder'''
+        self.encoder.trainable = not lock
 
     def save(
             self,
