@@ -243,7 +243,7 @@ class USIM(tf.keras.Model):
             x [Tensor]: The input to the USIM model
             y [Tuple[Tensor, Tensor]]: The expected output of the USIM model, with the first element being the expected prediction and the second being the expected latent features
             optimizer [Union[str, Optimizer]]: The optimizer to apply the gradient decent
-            loss_fn [Union[str, Loss]]: The loss function to implement
+            loss_fn [CustomLoss]: The loss function to implement
             metric_fn [Metric]: The evaluation metric (default None)
             weight [Tensor]: The weight of each sample
 
@@ -257,7 +257,14 @@ class USIM(tf.keras.Model):
         # Begin tracking gradient
         with tf.GradientTape() as tape:
             logits = self(x, decoder_name=decoder_name, training=True)
+            latent = logits[1]
             
+            additional_reconstruction = []
+            for name, decoder in self.decoder.items():
+                if name != decoder_name:
+                    additional_reconstruction.append(decoder(latent, training=True))
+
+            loss = loss_fn(y[1], logits[1], y[0], logits[0], additional_reconstruction, sample_weight=weight) 
             loss = loss_fn(y, logits, sample_weight=weight)
             loss += self.get_loss(decoder_name)
 

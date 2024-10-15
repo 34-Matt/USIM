@@ -2,7 +2,7 @@ from constants import STRUCT_LIST
 from main import USIM
 from dataManager import SynergyDataManager
 from modelLayers import EncoderModel, AngleDecoderModel, imageSize, latentSize, jointCounts
-from customLoss import CustomLoss
+from customLoss import ReconRegLoss
 
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
@@ -61,7 +61,7 @@ for s in key_list:
 model.initialize()
 optimizer = Adam(0.0005)
 optimizer.build(model.getAllTrainable())
-loss_fn = CustomLoss(MeanSquaredError(), CosineSimilarity(), 0.9)
+loss_fn = ReconRegLoss(l1=MeanSquaredError(), l2=CosineSimilarity(), alpha=0.9)
 metric_fn = RootMeanSquaredError()
 alpha = 0.9
 metric = {k:[] for k in key_list}
