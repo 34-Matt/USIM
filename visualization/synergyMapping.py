@@ -97,7 +97,7 @@ def createMeekerObject(handType:str) -> MeekerObject:
         return MeekerObject(humanHandStruct, ['rh_WRJ1', 'rh_WRJ2'])
     elif handType.lower() == 'allegro':
         return MeekerObject(allegroHandStruct)
-    elif handType.lower() == 'shadow':
+    elif handType.lower() == 'shadow' or handType.lower() == 'shadow5':
         return MeekerObject(shadowHandStruct, ['rh_WRJ1', 'rh_WRJ2'])
     elif handType.lower() == 'shadow4':
         return MeekerObject(shadow4HandStruct)
@@ -180,5 +180,7 @@ for count1 in range(len(df_list)-1):
         axis = fig.add_subplot(111)
         average = diff.mean()
         axis.bar(['Spread', 'Bend', 'Curl'], average)
+        axis.set_ylabel('Average Difference')
+        fig.tight_layout()
         plt.savefig(savename+f"_comparison_{count1}_{count2}_bar.png")
         plt.close(fig)
