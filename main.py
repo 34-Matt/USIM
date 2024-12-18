@@ -12,6 +12,7 @@ class USIM(tf.keras.Model):
             self,
             input_size:List[int],
             latent_size: int,
+            synergy_size: int,
             encoder_layers: tf.keras.Model,
             **kwargs
     ):
@@ -20,13 +21,19 @@ class USIM(tf.keras.Model):
         Args:
             input_size (List[int]): The input size of the model
             latent_size (int): The size of the latent features in the model
+            synergy_size (int): The portion of the latent features that are defined synergy
             encoder_layers (List[Layer]): The list of layers for the encoder portion of the model
         '''
         super().__init__(**kwargs)
         self.input_size = input_size
         self.latent_size = latent_size
+        self.synergy_size = synergy_size
         self.encoder = encoder_layers
         self.decoder = {}
+
+        # Defined synergy should be smaller than latent features
+        if synergy_size > latent_size:
+            raise ValueError(f"The latent features of size {latent_size} is smaller than the defined synergy space of size {synergy_size}")
 
     def validateInput(
             self,
@@ -77,6 +84,7 @@ class USIM(tf.keras.Model):
             name (str): A name to identify the decoder
             layers (List[Layer]): The list of layers for the decoder portion of the model
         '''
+        # Check if decoder already exists
         if name in self.decoder:
             raise IndexError(f"The name {name} already exists as the decoder in the model.")
 
@@ -186,7 +194,7 @@ class USIM(tf.keras.Model):
                 )
         
         with open(os.path.join(filepath, 'param.pickle'), 'wb') as f:
-            pickle.dump((self.input_size, self.latent_size), f)
+            pickle.dump((self.input_size, self.latent_size, self.synergy_size), f)
 
     @staticmethod
     def load(filepath:str):
@@ -196,11 +204,11 @@ class USIM(tf.keras.Model):
             filepath [str]: The location of the model to load
         '''
         with open(os.path.join(filepath, 'param.pickle'), 'rb') as f:
-            input_size, latent_size = pickle.load(f)
+            input_size, latent_size, synergy_size = pickle.load(f)
 
         encoder = tf.keras.models.load_model(os.path.join(filepath, 'encoder'))
         
-        model = USIM(input_size, latent_size, encoder)
+        model = USIM(input_size, latent_size, synergy_size, encoder)
         
         for file in os.listdir(filepath):
             if file.startswith('decoder_'):
@@ -210,7 +218,7 @@ class USIM(tf.keras.Model):
         return model
 
 
-#@tf.function
+@tf.function
 def train_step(
     model: "USIM",
     decoder_name: str,
@@ -245,11 +253,11 @@ def train_step(
     # Begin tracking gradient
     with tf.GradientTape() as tape:
         logits = model(x, decoder_name=decoder_name, training=True)
-        #ys = tf.concat(y,1)
-        #ls = tf.concat(logits,1)
+        logits_synergy = logits[1][:,:model.synergy_size]
+        logits_synergy = logits[1][:,:model.synergy_size]
         
         loss = loss_fn(y[0], logits[0], sample_weight=weight)
-        loss += loss_fn(y[1], logits[1], sample_weight=weight)
+        loss += loss_fn(y[1], logits_synergy, sample_weight=weight)
 
     # Apply the gradient:
     weights = model.getTrainable(decoder_name)
@@ -258,6 +266,6 @@ def train_step(
 
     # Update metric if applicable
     metric_fn.update_state(y[0], logits[0])
-    metric_fn.update_state(y[1], logits[1])
+    metric_fn.update_state(y[1], logits_synergy)
 
     return loss

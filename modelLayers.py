@@ -8,7 +8,7 @@ from tensorflow.keras import activations
 
 # Tools for machine learning
 imageSize = (224,224,1)
-latentSize = 3
+latentSize = 4
 
 humanCols_joint = []
 for count in range(30):
@@ -63,7 +63,7 @@ class EncoderModel(Model):
         self.encode6 = Dense(100, LeakyReLU())
         self.encode7 = Dropout(.2)
         self.encode8 = Dense(20, LeakyReLU())
-        self.encode9 = Dense(3, activations.sigmoid)
+        self.encode9 = Dense(4, activations.sigmoid)
     
         for layer in self.base.layers:
             layer.trainable = False
@@ -95,7 +95,7 @@ class AngleDecoderModel(Model):
         self.decode1 = Dense(5, LeakyReLU())
         self.decode2 = Dense(output_size, activations.sigmoid)
 
-    def call(self, inputs):
+    def call(self, inputs, training=False):
         x = self.decode1(inputs)
         x = self.decode2(x)
         return x

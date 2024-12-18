@@ -11,6 +11,6 @@ STRUCT_LIST = {
 BAD_JOINTS = {
     'Human': ['rh_WRJ1', 'rh_WRJ2'],
     'Shadow5': ['rh_WRJ1', 'rh_WRJ2'],
-    'Shadow4': None,
-    'Shadow3': None
+    'Shadow4': [],
+    'Shadow3': []
 }

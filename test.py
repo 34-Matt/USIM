@@ -6,18 +6,20 @@ import regex as re
 import numpy as np
 import pandas as pd
 
+from constants import *
 from main import USIM
 from dataManager import SynergyDataManager
+from modelLayers import imageSize
 
 from dataManipulation.MymeekerStructure import MeekerObject, humanHandStruct, shadowHandStruct, shadow4HandStruct, shadow3HandStruct, allegroHandStruct
 
 
 # Read Arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('--data_path', help='Path to the data folder')
-parser.add_argument('--model_path', help='Path to the model folder')
-parser.add_argument('--model_name', help='Name of the model')
-parser.add_argument('--input_struct', help='Input structure of the model')
+parser.add_argument('data_path', help='Path to the data folder')
+parser.add_argument('model_path', help='Path to the model folder')
+parser.add_argument('model_name', help='Name of the model')
+parser.add_argument('input_struct', help='Input structure of the model')
 args = parser.parse_args()
 
 dataPath = args.data_path
@@ -86,23 +88,32 @@ for model_struct in model.decoder.keys():
         meeker_struct = MeekerObject(shadow3HandStruct)
 
     jcols = meeker_struct.joint_col
+    scols = None
 
     for index in range(len(imgList)):
         joint = trainingDf.iloc[index]
         joint = np.reshape(joint.values, (1, -1))
 
-        synergy = trainingDf_synergy.iloc[index]
-        scols = synergy.index
-        synergy = np.reshape(synergy.values, (1, -1))
+        synergy_series = trainingDf_synergy.iloc[index]
+        synergy = np.reshape(synergy_series.values, (1, -1))
 
         image =cv2.imread(img_start+str(index).zfill(img_number_length) +img_end, cv2.IMREAD_UNCHANGED)
         image = cv2.resize(image, (224, 224))
         image = np.reshape(image, (1, 224, 224, 1))
         image = image.astype(np.float64)
 
-        predict = model(image, model_struct)
+        predict = model(image, decoder_name=model_struct)
         joint_pred = pd.Series(np.reshape(predict[0], (-1,)), jcols)
         joint_list.append(joint_pred)
+
+        if scols is None:
+            scols = synergy_series.index
+            diff = predict[1].shape[1] - len(scols)
+            if diff < 0:
+                raise IndexError(f"The output size of the latent features is {predict[1].shape}, but was expected at least {len(scols)}")
+            elif diff > 0:
+                scols = scols.append(pd.Index([f"Additional{i}" for i in range(diff)]))
+
         synergy_pred = pd.Series(np.reshape(predict[1], (-1,)), scols)
         synergy_list.append(synergy_pred)
         
