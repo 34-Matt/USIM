@@ -169,3 +169,6 @@ model/
 
 # Ingore VSCode settings
 .vscode/
+
+# Ignore the batch script
+batchrun.sh
