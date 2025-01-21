@@ -226,6 +226,7 @@ def train_step(
     y: Tuple[tf.Tensor, tf.Tensor],
     optimizer: Union[str, tf.keras.optimizers.Optimizer],
     loss_fn: Union[str, tf.keras.losses.Loss],
+    alpha: float = 1,
     metric_fn: tf.keras.metrics.Metric = None,
     weight = None
 ) -> float:
@@ -238,6 +239,7 @@ def train_step(
         y [Tuple[Tensor, Tensor]]: The expected output of the USIM model, with the first element being the expected prediction and the second being the expected latent features
         optimizer [Union[str, Optimizer]]: The optimizer to apply the gradient decent
         loss_fn [Union[str, Loss]]: The loss function to implement
+        alpha [float]: The weight to apply to the synergy loss
         metric_fn [Metric]: The evaluation metric (default None)
 
     Returns:
@@ -257,7 +259,7 @@ def train_step(
         logits_synergy = logits[1][:,:model.synergy_size]
         
         loss = loss_fn(y[0], logits[0], sample_weight=weight)
-        loss += loss_fn(y[1], logits_synergy, sample_weight=weight)
+        loss += alpha*loss_fn(y[1], logits_synergy, sample_weight=weight)
 
     # Apply the gradient:
     weights = model.getTrainable(decoder_name)

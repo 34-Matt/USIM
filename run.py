@@ -1,7 +1,7 @@
 from constants import *
 from main import USIM, train_step
 from dataManager import SynergyDataManager
-from modelLayers import EncoderModel, AngleDecoderModel, imageSize, latentSize, jointCounts
+from modelLayers import EncoderModel, AngleDecoderModel, imageSize, jointCounts
 
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
@@ -19,21 +19,25 @@ import matplotlib.pyplot as plt
 parser = argparse.ArgumentParser()
 parser.add_argument('data_path', help='Path to the data folder')
 parser.add_argument('structs', nargs='+', help='List of structures to train on')
+parser.add_argument('latent', type=int, help='The number of latent features from the encoder')
 parser.add_argument('--save_path', help='Path to save the model', default='.')
 parser.add_argument('--model_name', help='Name of the model', default='model')
 parser.add_argument('--epochs', '-e', type=int, help='Number of epochs to train', default=200)
 parser.add_argument('--batch', '-b', type=int, help='Batch size', default=15)
+parser.add_argument('--alpha', '-a', type=float, help='The alpha value for the synergy loss', default=1)
 args = parser.parse_args()
 
 structs = args.structs
 dataPath = args.data_path
+latentSize = args.latent
 epoch = args.epochs
 batch = args.batch
 save_path = args.save_path
 model_name = args.model_name
+alpha = args.alpha
 
 # Create the Model
-model = USIM(imageSize, latentSize, 3, EncoderModel())
+model = USIM(imageSize, latentSize, 3, EncoderModel(latentSize=latentSize))
 
 key_list = []
 for s in structs:
@@ -74,7 +78,7 @@ for ep in range(epoch):
             weight = (3 - np.sum(syn.values, axis=1)) / 3 + 0.01
 
             #Train on Data
-            train_step(model, key, img, [joint, synergy], optimizer, loss_fn, metric_fn, weight)
+            train_step(model, key, img, [joint, synergy], optimizer, loss_fn, alpha, metric_fn, weight)
             #hist = model.train_on_batch(image, [joint, synergy], return_dict=True)
         metric[key].append(metric_fn.result())
         metric_fn.reset_state()
