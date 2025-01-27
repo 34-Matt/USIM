@@ -1,5 +1,5 @@
 from tensorflow.keras.layers import Dense, LeakyReLU, \
-    Dropout, GlobalAveragePooling2D, Concatenate
+    Dropout, GlobalAveragePooling2D, Concatenate, Conv2d, MaxPooling2D
 from tensorflow.keras import Model
 from tensorflow.keras.applications import ResNet50
 #from tensorflow.keras.regularizers import l2
@@ -43,15 +43,22 @@ class EncoderModel(Model):
         super().__init__(*args, **kwargs)
         # Determine Encoder Layer
         #VGG16, ResNet50
-        self.stack = Concatenate()
-        self.base = ResNet50(weights='imagenet', include_top=False, input_shape=(224,224,3), pooling='avg')
+        #self.stack = Concatenate()
+        #self.base = ResNet50(weights='imagenet', include_top=False, input_shape=(224,224,3), pooling='avg')
 
         #encodeLayers.append(tempBase)
         
         #self.resconv1 = res_conv(3, (1, 64))
         #self.resconv2 = res_conv(3, (64, 32))
         #self.resconv3 = res_conv(3, (32, 32))
-        
+
+        self.conv1 = Conv2d(64, (5, 5), strides=3, activation='relu', input_shape=imageSize)
+        self.max1 = MaxPooling2D((3,3))
+        self.conv2 = Conv2d(64, (5, 5), strides=3, activation='relu')
+        self.max2 = MaxPooling2D((3,3))
+        self.conv2 = Conv2d(64, (3, 3), strides=2, activation='relu')
+        self.max2 = MaxPooling2D((2,2))
+        self.conv3 = Conv2d(64, (3, 3), strides=2, activation='relu')
 
         self.pooling = GlobalAveragePooling2D()
         self.encode1 = Dense(1000, LeakyReLU())
@@ -64,17 +71,23 @@ class EncoderModel(Model):
         self.encode8 = Dense(20, LeakyReLU())
         self.encode9 = Dense(latentSize, activations.sigmoid)
     
-        for layer in self.base.layers:
-            layer.trainable = False
+        #for layer in self.base.layers:
+        #    layer.trainable = False
 
     def call(self, inputs, training=False):
-        x = self.stack([inputs] * 3)
-        x = self.base(x)
+        #x = self.stack([inputs] * 3)
+        #x = self.base(x)
+        
         #x = self.resconv1(input)
         #x = self.resconv2(x)
         #x = self.resconv3(x)
+        x = self.conv1(inputs)
+        x = self.max1(x)
+        x = self.conv2(x)
+        x = self.max2(x)
+        x = self.conv3(x)
 
-        #x = self.pooling(x)
+        x = self.pooling(x)
         x = self.encode1(x)
         x = self.encode2(x)
         x = self.encode3(x, training=training)
