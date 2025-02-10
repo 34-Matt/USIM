@@ -1,5 +1,5 @@
 from tensorflow.keras.layers import Dense, LeakyReLU, \
-    Dropout, GlobalAveragePooling2D, Concatenate, Conv2d, MaxPooling2D
+    Dropout, GlobalAveragePooling2D, Concatenate, Conv2D, MaxPooling2D
 from tensorflow.keras import Model
 from tensorflow.keras.applications import ResNet50
 #from tensorflow.keras.regularizers import l2
@@ -52,13 +52,13 @@ class EncoderModel(Model):
         #self.resconv2 = res_conv(3, (64, 32))
         #self.resconv3 = res_conv(3, (32, 32))
 
-        self.conv1 = Conv2d(64, (5, 5), strides=3, activation='relu', input_shape=imageSize)
+        self.conv1 = Conv2D(64, (5, 5), strides=3, activation='relu', input_shape=imageSize)
         self.max1 = MaxPooling2D((3,3))
-        self.conv2 = Conv2d(64, (5, 5), strides=3, activation='relu')
+        self.conv2 = Conv2D(64, (5, 5), strides=3, activation='relu')
         self.max2 = MaxPooling2D((3,3))
-        self.conv2 = Conv2d(64, (3, 3), strides=2, activation='relu')
+        self.conv2 = Conv2D(64, (3, 3), strides=2, activation='relu')
         self.max2 = MaxPooling2D((2,2))
-        self.conv3 = Conv2d(64, (3, 3), strides=2, activation='relu')
+        self.conv3 = Conv2D(64, (3, 3), strides=2, activation='relu')
 
         self.pooling = GlobalAveragePooling2D()
         self.encode1 = Dense(1000, LeakyReLU())
