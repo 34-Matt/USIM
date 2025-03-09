@@ -5,7 +5,7 @@ import glob
 import numpy as np
 import pandas as pd
 
-from typing import Tuple, List, Generator
+from typing import Tuple, List, Generator, Union
 
 from dataManipulation.MymeekerStructure import MeekerObject
 
@@ -125,3 +125,19 @@ class SynergyDataManager():
                 img[i] = cur_img.reshape(self.img_size)
 
         return img
+    
+    def normalizeWrapper(self, joints:Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
+        if isinstance(joints, pd.DataFrame):
+            return joints.apply(MeekerObject.normalize, axis=1)
+        elif isinstance(joints, pd.Series):
+            return MeekerObject.normalize(joints)
+        else:
+            raise TypeError("Expected the inputs to be a pandas object.")
+
+    def denormalizeWrapper(self, joints:Union[pd.DataFrame, pd.Series]) -> Union[pd.DataFrame, pd.Series]:
+        if isinstance(joints, pd.DataFrame):
+            return joints.apply(MeekerObject.denormalize, axis=1)
+        elif isinstance(joints, pd.Series):
+            return MeekerObject.denormalize(joints)
+        else:
+            raise TypeError("Expected the inputs to be a pandas object.")
