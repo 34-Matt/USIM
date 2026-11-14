@@ -172,3 +172,7 @@ model/
 
 # Ignore the batch script
 batchrun.sh
+
+# Ignore training results
+results/
+tf/

@@ -33,7 +33,8 @@ class SynergyDataManager():
         self.jointDf = pd.read_csv(path_csv[0], index_col=0)
         for bj in badJoints:
             self.jointDf.drop(bj, axis=1, inplace=True, errors="ignore")
-        self.synergyDf = self.jointDf.apply(self.meeker.forwardProject, axis=1)
+        self.synergyDf = self.jointDf.apply(self.meeker.forwardProject, axis=1, isnormalized=False)
+        self.normalizedDf = self.jointDf.apply(self.meeker.normalize, axis=1)
 
         # Get image string
         tempimg = glob.glob(os.path.join(dataPath, '*.png'))[0]
@@ -81,8 +82,7 @@ class SynergyDataManager():
                 indices = indice_list.copy()
                 indice_list = []
         
-            jointDf = self.jointDf.iloc[indices]
-            synergyDf = self.synergyDf.iloc[indices]
+            jointDf, synergyDf = self.__joint_sample(indices)
 
             img = self.__image_sample(indices)
 
@@ -99,12 +99,17 @@ class SynergyDataManager():
             synergyDf [DataFrame]: The synergy data
             img [ndarray]: The image data
         '''
-        jointDf = self.jointDf.iloc[indices]
-        synergyDf = self.synergyDf.iloc[indices]
+        jointDf, synergyDf = self.__joint_sample(indices)
 
         img = self.__image_sample(indices)
 
         return jointDf, synergyDf, img
+
+    def __joint_sample(self, indices: List[int]) -> Tuple[pd.Series, pd.Series]:
+        #jointDf = self.jointDf.iloc[indices]
+        jointDf = self.normalizedDf.iloc[indices]
+        synergyDf = self.synergyDf.iloc[indices]
+        return jointDf, synergyDf
     
     def __image_sample(self, indices: List[int]) -> np.ndarray:
         # Initialize image array

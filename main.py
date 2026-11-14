@@ -28,8 +28,9 @@ class USIM(tf.keras.Model):
         self.input_size = input_size
         self.latent_size = latent_size
         self.synergy_size = synergy_size
-        self.encoder = encoder_layers
+        self.encoder_image = encoder_layers
         self.decoder = {}
+        self.encoder_joint = {}
 
         # Defined synergy should be smaller than latent features
         if synergy_size > latent_size:
@@ -76,7 +77,8 @@ class USIM(tf.keras.Model):
     def add_decoder(
             self,
             name: str,
-            layers: tf.keras.Model
+            layers: tf.keras.Model,
+            encoder: tf.keras.Model
     ) -> None:
         '''Adds a decoder to the model
         
@@ -89,6 +91,7 @@ class USIM(tf.keras.Model):
             raise IndexError(f"The name {name} already exists as the decoder in the model.")
 
         self.decoder[name] = layers
+        self.encoder_joint[name] = encoder
 
     def call(
             self,
@@ -111,7 +114,7 @@ class USIM(tf.keras.Model):
         '''
         if decoder_name is None:
             raise ValueError('Decoder name is required to call the model')
-        Latent = self.encoder.call(inputs, training=training)
+        Latent = self.encoder_image.call(inputs, training=training)
         Prediction = self.decoder[decoder_name].call(Latent, training=training)
         return [Prediction, Latent]
 
@@ -127,7 +130,7 @@ class USIM(tf.keras.Model):
         Returns:
             weights [list]: The list of weights in the autoencoder process
         '''
-        weights = self.encoder.trainable_weights
+        weights = self.encoder_image.trainable_weights
         weights.extend(self.decoder[decoder_name].trainable_weights)
         return weights
 
@@ -137,9 +140,10 @@ class USIM(tf.keras.Model):
         Returns:
             weights [list]: The list of weights in the USIM model
         '''
-        weights = self.encoder.trainable_weights
-        for decoder in self.decoder.values():
-            weights.extend(decoder.trainable_weights)
+        weights = self.encoder_image.trainable_weights
+        for name in self.decoder.keys():
+            weights.extend(self.decoder[name].trainable_weights)
+            weights.extend(self.encoder_joint[name].trainable_weights)
         return weights
     
     def initialize(self):
@@ -147,9 +151,10 @@ class USIM(tf.keras.Model):
         temp_input = tf.ones((5, *self.input_size))
         temp_latent = tf.ones((5, self.latent_size))
 
-        self.encoder(temp_input)
-        for decoder in self.decoder.values():
-            decoder(temp_latent)
+        self.encoder_image(temp_input)
+        for name in self.decoder.keys():
+            temp_joint = self.decoder[name](temp_latent)
+            self.encoder_joint[name](temp_joint)
 
     def save(
             self,
@@ -172,7 +177,7 @@ class USIM(tf.keras.Model):
             options [Any]: The options to save with the model
             save_traces [bool]: If the traces should be saved with the model
         '''
-        self.encoder.save(
+        self.encoder_image.save(
             os.path.join(filepath, 'encoder'),
             overwrite=overwrite,
             include_optimizer=include_optimizer,
@@ -182,9 +187,18 @@ class USIM(tf.keras.Model):
             save_traces=save_traces
             )
         
-        for name, decoder in self.decoder.items():
-            decoder.save(
+        for name in self.decoder.keys():
+            self.decoder[name].save(
                 os.path.join(filepath, 'decoder_'+name),
+                overwrite=overwrite,
+                include_optimizer=include_optimizer,
+                save_format=save_format,
+                signatures=signatures,
+                options=options,
+                save_traces=save_traces
+                )
+            self.encoder_joint[name].save(
+                os.path.join(filepath, 'encoder_'+name),
                 overwrite=overwrite,
                 include_optimizer=include_optimizer,
                 save_format=save_format,
@@ -213,7 +227,12 @@ class USIM(tf.keras.Model):
         for file in os.listdir(filepath):
             if file.startswith('decoder_'):
                 name = file[8:]
-                model.add_decoder(name, tf.keras.models.load_model(os.path.join(filepath, file)))
+                encoder_name = file.replace("decoder", "encoder")
+                model.add_decoder(
+                    name,
+                    tf.keras.models.load_model(os.path.join(filepath, file)),
+                    tf.keras.models.load_model(os.path.join(filepath, encoder_name))
+                    )
         
         return model
 
@@ -256,10 +275,15 @@ def train_step(
     with tf.GradientTape() as tape:
         logits = model(x, decoder_name=decoder_name, training=True)
         logits_synergy = logits[1][:,:model.synergy_size]
-        logits_synergy = logits[1][:,:model.synergy_size]
         
         loss = loss_fn(y[0], logits[0], sample_weight=weight)
         loss += alpha*loss_fn(y[1], logits_synergy, sample_weight=weight)
+
+        for names in model.encoder_joint.keys():
+            target_joint = model.decoder[names](logits[1])
+            target_latent = model.encoder_joint[names](target_joint)
+            temp_loss = loss_fn(logits[1], target_latent)
+            loss += alpha*temp_loss
 
     # Apply the gradient:
     weights = model.getTrainable(decoder_name)
