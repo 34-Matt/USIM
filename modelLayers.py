@@ -35,7 +35,8 @@ jointCounts = {
     'Human_Angle': len(humanCols_angle),
     'Shadow5': len(shadow5Cols),
     'Shadow4': len(shadow4Cols),
-    'Shadow3': len(shadow3Cols)
+    'Shadow3': len(shadow3Cols),
+    'Allegro': len(allegroCols)
 }
 
 class EncoderModel(Model):
@@ -54,8 +55,6 @@ class EncoderModel(Model):
 
         self.conv1 = Conv2D(64, (5, 5), strides=3, activation='relu', input_shape=imageSize)
         self.max1 = MaxPooling2D((3,3))
-        self.conv2 = Conv2D(64, (5, 5), strides=3, activation='relu')
-        self.max2 = MaxPooling2D((3,3))
         self.conv2 = Conv2D(64, (3, 3), strides=2, activation='relu')
         self.max2 = MaxPooling2D((2,2))
         self.conv3 = Conv2D(64, (3, 3), strides=2, activation='relu')

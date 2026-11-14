@@ -37,32 +37,38 @@ model_name = args.model_name
 alpha = args.alpha
 
 # Create the Model
+print("Creating Models")
 model = USIM(imageSize, latentSize, 3, EncoderModel(latentSize=latentSize))
 
 key_list = []
 for s in structs:
     if 'human' in s.lower():
-        model.add_decoder('Human', AngleDecoderModel(jointCounts['Human_Angle']))
+        model.add_decoder('Human', AngleDecoderModel(jointCounts['Human_Angle']), AngleDecoderModel(latentSize))
         key_list.append('Human')
     elif 'shadow5' in s.lower():
-        model.add_decoder('Shadow5', AngleDecoderModel(jointCounts['Shadow5']))
+        model.add_decoder('Shadow5', AngleDecoderModel(jointCounts['Shadow5']), AngleDecoderModel(latentSize))
         key_list.append('Shadow5')
     elif 'shadow4' in s.lower():
-        model.add_decoder('Shadow4', AngleDecoderModel(jointCounts['Shadow4']))
+        model.add_decoder('Shadow4', AngleDecoderModel(jointCounts['Shadow4']), AngleDecoderModel(latentSize))
         key_list.append('Shadow4')
     elif 'shadow3' in s.lower():
-        model.add_decoder('Shadow3', AngleDecoderModel(jointCounts['Shadow3']))
+        model.add_decoder('Shadow3', AngleDecoderModel(jointCounts['Shadow3']), AngleDecoderModel(latentSize))
         key_list.append('Shadow3')
+    elif 'allegro' in s.lower():
+        model.add_decoder('Allegro', AngleDecoderModel(jointCounts['Allegro']), AngleDecoderModel(latentSize))
+        key_list.append('Allegro')
 
 # Load data
+print("Loading Data")
 trainingObjects = {}
 
 for s in key_list:
-    trainingObjects[s] = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'training'), STRUCT_LIST[s], BAD_JOINTS[s])
+    #trainingObjects[s] = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'training'), STRUCT_LIST[s], BAD_JOINTS[s])
+    trainingObjects[s] = SynergyDataManager(imageSize, os.path.join(dataPath, s), STRUCT_LIST[s], BAD_JOINTS[s])
 
 # Training Loop
 model.initialize()
-optimizer = Adam(0.0005)
+optimizer = Adam(0.00005)
 optimizer.build(model.getAllTrainable())
 loss_fn = MeanSquaredError()
 metric_fn = RootMeanSquaredError() 
@@ -92,7 +98,8 @@ if not os.path.exists(save_path):
 testingObject = None
 
 for s in key_list:
-    testingObject = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'testing'), STRUCT_LIST[s], BAD_JOINTS[s])
+    #testingObject = SynergyDataManager(imageSize, os.path.join(dataPath, s, 'testing'), STRUCT_LIST[s], BAD_JOINTS[s])
+    testingObject = trainingObjects[s]
 
     ## Iterate over each
     synergy_list = []
